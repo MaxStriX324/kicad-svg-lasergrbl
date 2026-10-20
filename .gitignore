@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# User boards / generated laser files (do not commit PCB designs)
+*.svg
+*_laser.png
+*_laser_settings.txt
+LASERGRBL_SETTINGS.txt
+lasergrbl_sizes.csv
+
+# Workspace files
+.DS_Store
+Thumbs.db
