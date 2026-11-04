@@ -237,7 +237,7 @@ def combined_report(results: list[Result], errors: list[tuple[str, str]], dpi: i
 
 
 def cli() -> int:
-    from project_output import run_batch
+    from project_output import find_svg_inputs, run_batch
 
     parser = argparse.ArgumentParser(
         description='KiCad SVG -> project folder with PNG + GRBL NC + reports')
@@ -248,6 +248,8 @@ def cli() -> int:
     parser.add_argument('--mirror-x', type=int, choices=[0, 1], default=0)
     parser.add_argument('--gcode-lines-per-mm', type=int, choices=[10, 20], default=10)
     parser.add_argument('--gcode-mode', choices=['binary', 'grayscale'], default='binary')
+    parser.add_argument('--rebuild-existing', action='store_true',
+                        help='also regenerate SVG layers already in _PROJECT folders')
     parser.add_argument('--gcode-feed', type=int, default=1000)
     parser.add_argument('--gcode-power', type=int, default=1000)
     args = parser.parse_args()
@@ -261,10 +263,7 @@ def cli() -> int:
     if not folder.is_dir():
         parser.error('folder does not exist')
 
-    files = sorted(
-        (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == '.svg'),
-        key=lambda p: p.name.casefold(),
-    )
+    files = find_svg_inputs(folder, rebuild_existing=args.rebuild_existing)
     print(f'Found {len(files)} SVG(s). DPI {args.dpi}. Folder: {folder}')
     return run_batch(
         folder, files, dpi=args.dpi, threshold=args.threshold,
