@@ -6,6 +6,9 @@ __pycache__/
 
 # User boards / generated laser files (do not commit PCB designs)
 *.svg
+*.nc
+*.lps
+_*/
 *_laser.png
 *_laser_settings.txt
 LASERGRBL_SETTINGS.txt

@@ -5,13 +5,17 @@ set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
 
 rem ============================================
-rem KiCad SVG -> PNG + LaserGRBL TXT instructions
+rem KiCad SVG -> _PROJECT folder / PNG + NC + LaserGRBL TXT
 rem Put SVG files next to start.cmd
 rem ============================================
 set "DPI=508"
 set "INVERT=0"
 set "MIRROR_X=0"
 set "THRESHOLD=128"
+rem Raster NC output (match attached LaserGRBL example)
+set "GCODE_LINES_PER_MM=10"
+set "GCODE_FEED=1000"
+set "GCODE_POWER=1000"
 rem ============================================
 
 pushd "%~dp0"
@@ -19,6 +23,10 @@ if errorlevel 1 (
     echo ERROR: Cannot open script directory.
     pause
     exit /b 1
+)
+if not exist "project_output.py" (
+    echo ERROR: Missing project_output.py. Download the complete repository archive.
+    goto :start_failed
 )
 if not exist "svg_to_png_batch.py" (
     echo ERROR: Missing svg_to_png_batch.py
@@ -41,14 +49,15 @@ if errorlevel 1 goto :start_failed
 
 :run
 echo ============================================
-echo KiCad SVG - PNG + LaserGRBL TXT - v3
+echo KiCad SVG - PNG + LaserGRBL NC + TXT - v4
 echo ============================================
 echo Folder: %CD%
 echo DPI: %DPI%  INVERT: %INVERT%  MIRROR_X: %MIRROR_X%
+echo NC: %GCODE_LINES_PER_MM% lines/mm  F%GCODE_FEED%  S%GCODE_POWER%
 echo.
 
 rem No --folder argument: avoids Windows escaped trailing-slash issue.
-".venv\Scripts\python.exe" "svg_to_png_batch.py" --dpi %DPI% --threshold %THRESHOLD% --invert %INVERT% --mirror-x %MIRROR_X%
+".venv\Scripts\python.exe" "svg_to_png_batch.py" --dpi %DPI% --threshold %THRESHOLD% --invert %INVERT% --mirror-x %MIRROR_X% --gcode-lines-per-mm %GCODE_LINES_PER_MM% --gcode-feed %GCODE_FEED% --gcode-power %GCODE_POWER%
 set "EXIT_CODE=%errorlevel%"
 echo.
 if exist "LASERGRBL_SETTINGS.txt" (
@@ -56,9 +65,9 @@ if exist "LASERGRBL_SETTINGS.txt" (
     start "" notepad.exe "%CD%\LASERGRBL_SETTINGS.txt"
 )
 if "%EXIT_CODE%"=="0" (
-    echo DONE. PNG and TXT files are in this folder.
+    echo DONE. KiCad project folders contain SVG, PNG, NC and TXT files.
 ) else (
-    echo Some SVG conversions failed. See TXT report.
+    echo Some SVG conversions failed. See LASERGRBL_SETTINGS.txt.
 )
 popd
 pause

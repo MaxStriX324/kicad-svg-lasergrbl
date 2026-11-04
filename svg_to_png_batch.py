@@ -155,7 +155,8 @@ def guide_text(r: Result) -> str:
 '''
 
 
-def convert(path: Path, dpi: int, threshold: int, invert: bool, mirror_x: bool) -> Result:
+def convert(path: Path, dpi: int, threshold: int, invert: bool, mirror_x: bool,
+            output_dir: Path | None = None) -> Result:
     w_mm, h_mm = svg_mm(path)
     px_w, px_h = pixel_dims(w_mm, h_mm, dpi)
     if px_w < 1 or px_h < 1 or px_w * px_h > 120_000_000:
@@ -181,12 +182,14 @@ def convert(path: Path, dpi: int, threshold: int, invert: bool, mirror_x: bool) 
         mono = ImageOps.invert(mono)
     if mirror_x:
         mono = ImageOps.mirror(mono)
-    output = path.with_name(path.stem + '_laser.png')
+    destination = output_dir if output_dir is not None else path.parent
+    destination.mkdir(parents=True, exist_ok=True)
+    output = destination / (path.stem + '_laser.png')
     mono.save(output, 'PNG', dpi=(dpi, dpi), optimize=True)
 
     ppm = Decimal(dpi) / MM_PER_INCH
     h_if_w = w_mm * Decimal(px_h) / Decimal(px_w)
-    report = path.with_name(path.stem + '_laser_settings.txt')
+    report = destination / (path.stem + '_laser_settings.txt')
     result = Result(
         path.name, output.name, report.name, w_mm, h_mm, px_w, px_h, dpi,
         Decimal(px_w) / ppm - w_mm,
@@ -234,15 +237,25 @@ def combined_report(results: list[Result], errors: list[tuple[str, str]], dpi: i
 
 
 def cli() -> int:
-    parser = argparse.ArgumentParser(description='KiCad SVG -> LaserGRBL PNG + TXT report')
+    from project_output import run_batch
+
+    parser = argparse.ArgumentParser(
+        description='KiCad SVG -> project folder with PNG + GRBL NC + reports')
     parser.add_argument('--folder', type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument('--dpi', type=int, default=508)
     parser.add_argument('--threshold', type=int, default=128)
     parser.add_argument('--invert', type=int, choices=[0, 1], default=0)
     parser.add_argument('--mirror-x', type=int, choices=[0, 1], default=0)
+    parser.add_argument('--gcode-lines-per-mm', type=int, default=10)
+    parser.add_argument('--gcode-feed', type=int, default=1000)
+    parser.add_argument('--gcode-power', type=int, default=1000)
     args = parser.parse_args()
     if not 1 <= args.dpi <= 5000 or not 0 <= args.threshold <= 255:
         parser.error('dpi 1..5000; threshold 0..255')
+    if not 1 <= args.gcode_lines_per_mm <= 50:
+        parser.error('gcode-lines-per-mm must be 1..50')
+    if not 1 <= args.gcode_feed <= 30000 or not 1 <= args.gcode_power <= 1000:
+        parser.error('gcode-feed must be 1..30000, gcode-power 1..1000')
     folder = args.folder.resolve()
     if not folder.is_dir():
         parser.error('folder does not exist')
@@ -252,35 +265,12 @@ def cli() -> int:
         key=lambda p: p.name.casefold(),
     )
     print(f'Found {len(files)} SVG(s). DPI {args.dpi}. Folder: {folder}')
-    results: list[Result] = []
-    errors: list[tuple[str, str]] = []
-    for i, path in enumerate(files, 1):
-        print(f'[{i}/{len(files)}] {path.name}')
-        try:
-            r = convert(path, args.dpi, args.threshold, bool(args.invert), bool(args.mirror_x))
-            results.append(r)
-            print(f'  OK: {r.image} [{r.pixels_w}x{r.pixels_h}]')
-            print(f'  LASERGRBL: Autosize OFF, Size W={ru(r.width_mm)} mm, H~{ru(r.lasergrbl_h_if_w_mm)} mm')
-            print(f'  REPORT: {r.guide}')
-        except (OSError, ValueError, ET.ParseError, InvalidOperation, RuntimeError) as exc:
-            errors.append((path.name, str(exc)))
-            print(f'  ERROR: {exc}')
-        except Exception as exc:
-            errors.append((path.name, f'{type(exc).__name__}: {exc}'))
-            print(f'  ERROR: {type(exc).__name__}: {exc}')
-
-    (folder / REPORT_NAME).write_text(combined_report(results, errors, args.dpi), encoding='utf-8-sig')
-    with (folder / 'lasergrbl_sizes.csv').open('w', encoding='utf-8-sig', newline='') as f:
-        wr = csv.writer(f, delimiter=';')
-        wr.writerow(['SVG', 'PNG', 'Guide_TXT', 'SVG_W_mm', 'SVG_H_mm', 'PNG_PX_W', 'PNG_PX_H', 'DPI', 'H_if_W_entered_mm', 'H_delta_mm', 'Status'])
-        for r in results:
-            wr.writerow([r.source, r.image, r.guide, str(r.width_mm), str(r.height_mm), r.pixels_w, r.pixels_h, r.dpi, f'{r.lasergrbl_h_if_w_mm:.6f}', f'{r.lasergrbl_h_error_mm:+.6f}', 'OK'])
-        for name, error in errors:
-            wr.writerow([name, '', '', '', '', '', '', '', '', '', 'ERROR: ' + error])
-
-    print(f'\nDone: {len(results)} OK / {len(errors)} ERROR. Open {REPORT_NAME}')
-    return 1 if errors else 0
-
+    return run_batch(
+        folder, files, dpi=args.dpi, threshold=args.threshold,
+        invert=bool(args.invert), mirror_x=bool(args.mirror_x),
+        lines_per_mm=args.gcode_lines_per_mm, feed=args.gcode_feed,
+        power=args.gcode_power, convert=convert, combined_report=combined_report,
+    )
 
 if __name__ == '__main__':
     sys.exit(cli())
