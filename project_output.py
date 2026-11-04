@@ -26,7 +26,36 @@ REPORT_NAME = 'LASERGRBL_SETTINGS.txt'
 def project_folder(svg: Path) -> Path:
     """Only recognized KiCad copper layers get a project folder."""
     match = PROJECT_RE.fullmatch(svg.name)
-    return svg.parent / ('_' + match.group('name')) if match else svg.parent
+    if match is None:
+        return svg.parent
+    project_name = '_' + match.group('name')
+    return svg.parent if svg.parent.name.casefold() == project_name.casefold() else svg.parent / project_name
+
+
+def find_svg_inputs(folder: Path, *, rebuild_existing: bool = False) -> list[Path]:
+    """Collect new root SVGs and optionally rebuild existing project folders.
+
+    New root files take priority over the matching old project SVG.
+    """
+    incoming = sorted(
+        (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == '.svg'),
+        key=lambda p: p.name.casefold(),
+    )
+    if not rebuild_existing:
+        return incoming
+    pending = {(project_folder(p).resolve(), p.name.casefold()) for p in incoming}
+    for directory in sorted((p for p in folder.iterdir() if p.is_dir() and
+                             p.name.startswith('_')), key=lambda p: p.name.casefold()):
+        for p in sorted(directory.iterdir(), key=lambda p: p.name.casefold()):
+            if not p.is_file() or p.suffix.lower() != '.svg':
+                continue
+            if project_folder(p) != directory:
+                continue
+            key = directory.resolve(), p.name.casefold()
+            if key not in pending:
+                incoming.append(p)
+                pending.add(key)
+    return incoming
 
 
 def fmt_mm(value: Decimal | float) -> str:
@@ -104,7 +133,8 @@ def generate_gcode(png: Path, width_mm: Decimal, height_mm: Decimal, *,
                   for x in range(count_x)] if mode == 'binary'
                  else list(range(count_x)))
     widths = [fmt_mm(min(w, i / lines_per_mm)) for i in range(count_x + 1)]
-    output = png.with_suffix('.nc')
+    output = (png.with_name(png.stem + '_grayscale.nc') if mode == 'grayscale'
+              else png.with_suffix('.nc'))
     temporary = output.with_name(output.name + '.tmp')
     try:
         with temporary.open('w', encoding='ascii', newline='\n') as out:
@@ -191,7 +221,7 @@ def write_summary(folder: Path, results: list, errors: list[tuple[str, str]],
                          'H_if_W_entered_mm', 'H_delta_mm', 'Status'])
         for r in results:
             loc = locations.get(r.source, '.')
-            writer.writerow([loc, r.source, r.image, Path(r.image).with_suffix('.nc').name,
+            writer.writerow([loc, r.source, r.image, (Path(r.image).stem + ('_grayscale.nc' if mode == 'grayscale' else '.nc')),
                              r.guide, str(r.width_mm), str(r.height_mm), r.pixels_w,
                              r.pixels_h, r.dpi, f'{r.lasergrbl_h_if_w_mm:.6f}',
                              f'{r.lasergrbl_h_error_mm:+.6f}', 'OK'])
