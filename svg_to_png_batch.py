@@ -246,14 +246,15 @@ def cli() -> int:
     parser.add_argument('--threshold', type=int, default=128)
     parser.add_argument('--invert', type=int, choices=[0, 1], default=0)
     parser.add_argument('--mirror-x', type=int, choices=[0, 1], default=0)
-    parser.add_argument('--gcode-lines-per-mm', type=int, default=10)
+    parser.add_argument('--gcode-lines-per-mm', type=int, choices=[10, 20], default=10)
+    parser.add_argument('--gcode-mode', choices=['binary', 'grayscale'], default='binary')
     parser.add_argument('--gcode-feed', type=int, default=1000)
     parser.add_argument('--gcode-power', type=int, default=1000)
     args = parser.parse_args()
     if not 1 <= args.dpi <= 5000 or not 0 <= args.threshold <= 255:
         parser.error('dpi 1..5000; threshold 0..255')
-    if not 1 <= args.gcode_lines_per_mm <= 50:
-        parser.error('gcode-lines-per-mm must be 1..50')
+    if args.gcode_lines_per_mm not in (10, 20):
+        parser.error('gcode-lines-per-mm must be 10 or 20')
     if not 1 <= args.gcode_feed <= 30000 or not 1 <= args.gcode_power <= 1000:
         parser.error('gcode-feed must be 1..30000, gcode-power 1..1000')
     folder = args.folder.resolve()
@@ -269,7 +270,8 @@ def cli() -> int:
         folder, files, dpi=args.dpi, threshold=args.threshold,
         invert=bool(args.invert), mirror_x=bool(args.mirror_x),
         lines_per_mm=args.gcode_lines_per_mm, feed=args.gcode_feed,
-        power=args.gcode_power, convert=convert, combined_report=combined_report,
+        power=args.gcode_power, mode=args.gcode_mode,
+        convert=convert, combined_report=combined_report,
     )
 
 if __name__ == '__main__':
