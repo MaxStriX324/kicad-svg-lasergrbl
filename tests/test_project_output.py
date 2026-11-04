@@ -93,5 +93,29 @@ class ProjectOutputTests(unittest.TestCase):
             self.assertTrue(any(p.read_text() == 'initial f' for p in (folder / '_backups').glob('*.svg'))
 
 
+    def test_failed_regeneration_does_not_destroy_previous_outputs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = root / '_EVSE'
+            folder.mkdir()
+            old = folder / 'EVSE-F_Cu_laser.png'
+            old.write_bytes(b'previous valid PNG')
+            source = root / 'EVSE-F_Cu.svg'
+            source.write_text('new SVG')
+
+            def fails(src, dpi, threshold, invert, mirror, *, output_dir):
+                (output_dir / old.name).write_bytes(b'partial new PNG')
+                raise RuntimeError('test simulated rendering failure')
+
+            result = run_batch(root, [source], dpi=508, threshold=128,
+                               invert=False, mirror_x=False, lines_per_mm=10,
+                               feed=1000, power=1000, convert=fails,
+                               combined_report=lambda r, e, d: 'report')
+            self.assertEqual(result, 1)
+            self.assertTrue(source.exists())
+            self.assertEqual(old.read_bytes(), b'previous valid PNG')
+            self.assertFalse(list(folder.glob('.laser-stage-*')))
+
+
 if __name__ == '__main__':
     unittest.main()
