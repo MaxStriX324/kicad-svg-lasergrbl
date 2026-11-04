@@ -1,11 +1,12 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions DisableDelayedExpansion
 chcp 65001 >nul
+set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
 
 rem ============================================
-rem KiCad SVG -> PNG + lasergrbl TXT instructions
-rem SVG files must be next to this start.cmd
+rem KiCad SVG -> PNG + LaserGRBL TXT instructions
+rem Put SVG files next to start.cmd
 rem ============================================
 set "DPI=508"
 set "INVERT=0"
@@ -19,19 +20,26 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-if not exist ".venv\Scripts\python.exe" (
-    echo ERROR: Python libraries are not installed. Run install.cmd first.
-    popd
-    pause
-    exit /b 1
-)
 if not exist "svg_to_png_batch.py" (
     echo ERROR: Missing svg_to_png_batch.py
-    popd
-    pause
-    exit /b 1
+    goto :start_failed
 )
 
+rem A venv may contain python.exe but point to a removed Python installation.
+rem Validate execution and imports, not only the existence of the file.
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" -c "import pymupdf; from PIL import Image" >nul 2>nul
+    if not errorlevel 1 goto :run
+)
+if not exist "install.cmd" (
+    echo ERROR: Missing install.cmd. Download the complete repository archive.
+    goto :start_failed
+)
+echo Python environment is missing or broken. Repairing automatically...
+call "%~dp0install.cmd" /quiet
+if errorlevel 1 goto :start_failed
+
+:run
 echo ============================================
 echo KiCad SVG - PNG + LaserGRBL TXT - v3
 echo ============================================
@@ -55,3 +63,9 @@ if "%EXIT_CODE%"=="0" (
 popd
 pause
 exit /b %EXIT_CODE%
+
+:start_failed
+echo Converter could not start. See the error above.
+popd
+pause
+exit /b 1
