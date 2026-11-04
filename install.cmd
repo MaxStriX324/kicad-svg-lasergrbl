@@ -72,7 +72,7 @@ goto :success
 
 :check_venv
 if not exist "%VENV_PY%" exit /b 1
-"%VENV_PY%" -c "import sys; assert sys.prefix != sys.base_prefix" >nul 2>nul
+"%VENV_PY%" -c "import sys; assert sys.prefix != sys.base_prefix and sys.version_info >= (3, 10)" >nul 2>nul
 exit /b %errorlevel%
 
 :create_venv
@@ -105,6 +105,8 @@ if exist "%VENV%" (
     rmdir /s /q "%VENV%" >nul 2>nul
     if exist "%VENV%" exit /b 1
 )
+%* -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+if errorlevel 1 exit /b 1
 %* -m venv "%VENV%" >nul 2>nul
 if errorlevel 1 exit /b 1
 call :check_venv
