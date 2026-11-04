@@ -13,6 +13,7 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from PIL import Image
 
@@ -159,10 +160,16 @@ def run_batch(folder: Path, files: list[Path], *, dpi: int, threshold: int,
         print(f'[{idx}/{len(files)}] {svg.name} -> {target_dir.name}/')
         try:
             target_dir.mkdir(parents=True, exist_ok=True)
-            result = convert(svg, dpi, threshold, invert, mirror_x, output_dir=target_dir)
-            nc = generate_gcode(target_dir / result.image, result.width_mm,
-                                result.height_mm, lines_per_mm=lines_per_mm,
-                                feed=feed, power=power)
+            # Stage every generated file first: a failed SVG/NC conversion must
+            # not overwrite a previously successful project output.
+            with TemporaryDirectory(prefix='.laser-stage-', dir=target_dir) as stage_name:
+                stage = Path(stage_name)
+                result = convert(svg, dpi, threshold, invert, mirror_x, output_dir=stage)
+                nc = generate_gcode(stage / result.image, result.width_mm,
+                                    result.height_mm, lines_per_mm=lines_per_mm,
+                                    feed=feed, power=power)
+                for generated in (result.image, nc.name, result.guide):
+                    (stage / generated).replace(target_dir / generated)
             move_source_with_backup(svg, target_dir / svg.name)
             all_results.append(result)
             by_dir[target_dir].append(result)
