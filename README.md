@@ -18,9 +18,9 @@
 
 | Вход | Выход |
 |---|---|
-| `F_Cu.svg` | `F_Cu_laser.png`, `F_Cu_laser_settings.txt` |
-| `B_Cu.svg` | `B_Cu_laser.png`, `B_Cu_laser_settings.txt` |
-| Все SVG | `LASERGRBL_SETTINGS.txt`, `lasergrbl_sizes.csv` |
+| `EVSE-F_Cu.svg` | `_EVSE/EVSE-F_Cu_laser.png`, `_EVSE/EVSE-F_Cu_laser.nc`, TXT |
+| `EVSE-B_Cu.svg` | `_EVSE/EVSE-B_Cu_laser.png`, `_EVSE/EVSE-B_Cu_laser.nc`, TXT |
+| Все SVG | Общий `LASERGRBL_SETTINGS.txt`, CSV и отчёты по папкам |
 
 Настройки задаются в начале `start.cmd`:
 
@@ -29,6 +29,9 @@ set "DPI=508"
 set "INVERT=0"
 set "MIRROR_X=0"
 set "THRESHOLD=128"
+set "GCODE_LINES_PER_MM=10"
+set "GCODE_FEED=1000"
+set "GCODE_POWER=1000"
 ```
 
 - **508 DPI** = номинально 20 пикселей/мм, шаг 0,05 мм.
