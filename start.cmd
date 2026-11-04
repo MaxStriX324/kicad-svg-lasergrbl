@@ -12,7 +12,10 @@ set "DPI=508"
 set "INVERT=0"
 set "MIRROR_X=0"
 set "THRESHOLD=128"
-rem Raster NC output (match attached LaserGRBL example)
+rem Raster NC: binary (default) or grayscale; density 10 or 20 in BOTH axes
+set "GCODE_MODE=binary"
+rem Set to 1 to regenerate NC for SVGs already moved into _PROJECT folders.
+set "REBUILD_EXISTING=0"
 set "GCODE_LINES_PER_MM=10"
 set "GCODE_FEED=1000"
 set "GCODE_POWER=1000"
@@ -53,11 +56,13 @@ echo KiCad SVG - PNG + LaserGRBL NC + TXT - v4
 echo ============================================
 echo Folder: %CD%
 echo DPI: %DPI%  INVERT: %INVERT%  MIRROR_X: %MIRROR_X%
-echo NC: %GCODE_LINES_PER_MM% lines/mm  F%GCODE_FEED%  S%GCODE_POWER%
+echo NC: %GCODE_MODE%  %GCODE_LINES_PER_MM% samples/mm on X and Y  F%GCODE_FEED%  S%GCODE_POWER%  REBUILD=%REBUILD_EXISTING%
 echo.
 
+set "REBUILD_ARG="
+if "%REBUILD_EXISTING%"=="1" set "REBUILD_ARG=--rebuild-existing"
 rem No --folder argument: avoids Windows escaped trailing-slash issue.
-".venv\Scripts\python.exe" "svg_to_png_batch.py" --dpi %DPI% --threshold %THRESHOLD% --invert %INVERT% --mirror-x %MIRROR_X% --gcode-lines-per-mm %GCODE_LINES_PER_MM% --gcode-feed %GCODE_FEED% --gcode-power %GCODE_POWER%
+".venv\Scripts\python.exe" "svg_to_png_batch.py" --dpi %DPI% --threshold %THRESHOLD% --invert %INVERT% --mirror-x %MIRROR_X% %REBUILD_ARG% --gcode-mode %GCODE_MODE% --gcode-lines-per-mm %GCODE_LINES_PER_MM% --gcode-feed %GCODE_FEED% --gcode-power %GCODE_POWER%
 set "EXIT_CODE=%errorlevel%"
 echo.
 if exist "LASERGRBL_SETTINGS.txt" (
